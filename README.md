@@ -1,6 +1,6 @@
 #### Setting your API Key
 ```java
-Codequiry api = new Codequiry("c08cf5c30a8bf835daa62db519410a1e77c10addd9ac2532809b668ae712755f");
+Codequiry api = new Codequiry("YOUR API KEY");
 ```
 ## Usage
 #### Getting account information
