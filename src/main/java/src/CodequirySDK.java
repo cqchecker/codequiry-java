@@ -3,6 +3,11 @@ package src;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
 import io.socket.client.IO;
 import io.socket.client.Socket;
 import src.exceptions.CodequiryApiException;
@@ -12,11 +17,18 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
 
 public class CodequirySDK {
 
@@ -24,7 +36,49 @@ public class CodequirySDK {
     private static final String API_UPLOAD_URL = "https://codequiry.com/api/v1/check/upload";
     private static final String SOCKETS_BASE_URL = "https://api.codequiry.com/";
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = createObjectMapper();
+    
+    private static ObjectMapper createObjectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        
+        SimpleModule module = new SimpleModule();
+        module.addDeserializer(LocalDateTime.class, new JsonDeserializer<LocalDateTime>() {
+            @Override
+            public LocalDateTime deserialize(JsonParser jsonParser, DeserializationContext context) throws IOException {
+                String dateStr = jsonParser.getText();
+                try {
+                	List<DateTimeFormatter> formatters = Arrays.asList(
+            		    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+            		    new DateTimeFormatterBuilder()
+            		        .parseCaseInsensitive()
+            		        .appendPattern("MMM d, yyyy h:mm a 'UTC'")
+            		        .toFormatter(Locale.ENGLISH)
+            		);
+
+            		LocalDateTime date = null;
+            		for (DateTimeFormatter formatter : formatters) {
+            		    try {
+            		        date = LocalDateTime.parse(dateStr, formatter);
+            		        break;
+            		    } catch (DateTimeParseException e) {
+            		        // Ignore and try the next formatter
+            		    }
+            		}
+
+            		if (date == null) {
+            		    throw new IOException("Failed to parse date: " + dateStr);
+            		}
+            		return date;
+                } catch (Exception e) {
+                    throw new IOException("Failed to parse date: " + dateStr, e);
+                }
+            }
+        });
+
+        mapper.registerModule(module);
+        return mapper;
+    }
 
     private static final Map<String, String> baseHeaders = new HashMap<String, String>() {{
         put("Content-Type", "application/json");
@@ -102,24 +156,52 @@ public class CodequirySDK {
         }
     }
 
-    public UploadResult upload(Integer checkId, String filePath) {
-        String boundaryString = "----" + UUID.randomUUID() + "----";
+    public UploadResult upload(Integer checkid, String filePath) {
+        String boundaryString = "----" + UUID.randomUUID().toString() + "----";
         File file = new File(filePath);
+        
         Map<String, String> headers = new HashMap<>(baseHeaders);
         headers.put("Content-Type", "multipart/form-data; boundary=" + boundaryString);
 
-        StringBuilder sb = new StringBuilder();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PrintWriter pw = new PrintWriter(new OutputStreamWriter(baos, StandardCharsets.UTF_8));
 
-        String content = sb.append(boundaryString).append("\n")
-                .append("Content-Disposition: form-data; check_id=").append(checkId)
-                .append("\n\n").append(boundaryString).append("\n")
-                .append("Content-Disposition: form-data; name=\"file=\";https://filebin.net/8ma28c5daw9mhkv7/Main.zip?t=4skc8ndb").append(filePath)
-                .append("\nContent-Type: multipart/form-data\n")
-                .toString();//.getBytes();
+        // Add check_id part
+        pw.append("--" + boundaryString + "\r\n");
+        pw.append("Content-Disposition: form-data; name=\"check_id\"\r\n\r\n");
+        pw.append(checkid.toString() + "\r\n");
 
-            String json = post(API_UPLOAD_URL, content, headers);
-            return mapJsonToObject(json, UploadResult.class);
+        // Add file part
+        pw.append("--" + boundaryString + "\r\n");
+        pw.append("Content-Disposition: form-data; name=\"file\"; filename=\"" + file.getName() + "\"\r\n");
+        pw.append("Content-Type: " +URLConnection.guessContentTypeFromName(file.getName()) + "\r\n\r\n");
+        pw.flush();
 
+        // Write file data
+        FileInputStream fis;
+		try {
+			fis = new FileInputStream(file);
+	        byte[] buffer = new byte[4096];
+	        int bytesRead;
+	        while ((bytesRead  = fis.read(buffer)) != -1) {
+	            baos.write(buffer, 0, bytesRead);
+	        }
+	        fis.close();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        pw.append("\r\n"); // Ensure separation before the final boundary
+        pw.append("--" + boundaryString + "--\r\n");
+        pw.close();
+
+        byte[] multipartContent = baos.toByteArray();
+
+        String json = post(API_UPLOAD_URL, multipartContent, headers);
+        return mapJsonToObject(json, UploadResult.class);
     }
 
     private String post(String path, Object data, Map<String, String> headers) {

@@ -6,7 +6,7 @@ Codequiry api = new Codequiry("YOUR API KEY");
 #### Getting account information
 ```java
 Account account = api.getAccount();
-System.out.println(account.getName());
+System.out.println(account.getUser());
 ```
 #### Getting checks
 ```java

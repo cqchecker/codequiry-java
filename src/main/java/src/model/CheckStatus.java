@@ -3,6 +3,7 @@ package src.model;
 public class CheckStatus {
     private Check check;
     private String status;
+    private String error;
     private boolean dbcheck;
     private boolean webcheck;
     private int submissionCount;
@@ -12,6 +13,10 @@ public class CheckStatus {
         return check;
     }
 
+    public String getError() {
+        return error;
+    }
+    
     public String getStatus() {
         return status;
     }
@@ -40,6 +45,10 @@ public class CheckStatus {
         this.status = status;
     }
 
+    public void setError(String error) {
+        this.error = error;
+    }
+    
     public void setDbcheck(boolean dbcheck) {
         this.dbcheck = dbcheck;
     }

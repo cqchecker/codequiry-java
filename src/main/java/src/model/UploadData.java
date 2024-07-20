@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public class UploadData {
-    private float id;
+    private long id;
     private String filename;
     private float statusId;
     private LocalDateTime createdAt;
@@ -16,11 +16,11 @@ public class UploadData {
     private LocalDateTime modifyUpdatedAt;
     private List<AssignmentStatus> assignmentStatuses;
 
-    public float getId() {
+    public long getId() {
         return id;
     }
 
-    public void setId(float id) {
+    public void setId(long id) {
         this.id = id;
     }
 
