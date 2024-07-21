@@ -15,10 +15,10 @@ if (!checks.isEmpty()) {
     System.out.println(checks.get(0).getStatusId());
 }
 ```
-#### Creating checks (specify name and programming language)
-Examples: java, c-cpp, python, csharp, txt
+#### Creating checks (specify name and programming language id)
+Examples: javascript, java, c-cpp, python, csharp, txt
 ```java
-Check check = api.createCheck("name", "java");
+Check check = api.createCheck("name", "39");
 System.out.println(check.getCreatedAt());
 
 ```
